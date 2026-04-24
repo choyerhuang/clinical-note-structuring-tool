@@ -2,6 +2,7 @@ Django==6.0.4
 djangorestframework==3.17.1
 django-cors-headers==4.9.0
 django-environ==0.13.0
+dj-database-url
 openai==1.109.1
 python-docx==1.2.0
 psycopg[binary]==3.3.3
