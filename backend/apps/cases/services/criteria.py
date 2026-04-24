@@ -3,6 +3,13 @@ import re
 from apps.cases.services.mcg_rules import DIABETES_MCG
 from apps.cases.services.note_generation import normalize_generated_structured_input, safe_text
 
+KETONE_EVIDENCE_PATTERNS = [
+    r"\bacetone(?:\s+semiqt)?(?:\s*[:=])?\s*(?:[a-z0-9./+-]+\s*)?(large|moderate|small|positive|\d+)\b",
+    r"\bketones?(?:\s*[:=])?\s*(?:[a-z0-9./+-]+\s*)?(large|moderate|small|positive|\d+)\b",
+    r"\burine ketones?(?:\s*[:=])?\s*(?:[a-z0-9./+-]+\s*)?(large|moderate|small|positive|\d+)\b",
+    r"\bserum ketones?(?:\s*[:=])?\s*(?:[a-z0-9./+-]+\s*)?(large|moderate|small|positive|\d+)\b",
+]
+
 
 def _build_search_text(structured_output: dict, source_text: str | None) -> str:
     normalized_structured = normalize_generated_structured_input(structured_output)
@@ -88,6 +95,64 @@ def _contains_any(text: str, phrases: list[str]) -> str | None:
         if phrase in text:
             return phrase
     return None
+
+
+def find_ketone_evidence(text: str | None) -> str | None:
+    normalized_text = safe_text(text)
+    if not normalized_text:
+        return None
+
+    for pattern in KETONE_EVIDENCE_PATTERNS:
+        match = re.search(pattern, normalized_text, flags=re.IGNORECASE)
+        if match:
+            return " ".join(match.group(0).split())
+
+    fallback_match = _contains_any(
+        normalized_text.lower(),
+        [
+            "ketonemia",
+            "ketonuria",
+            "ketones present",
+            "ketone positive",
+            "positive ketones",
+            "beta-hydroxybutyrate",
+        ],
+    )
+    if fallback_match:
+        return fallback_match
+
+    return None
+
+
+def ketone_finding_from_evidence(evidence: str | None) -> str | None:
+    normalized_evidence = safe_text(evidence)
+    if not normalized_evidence:
+        return None
+
+    if "large" in normalized_evidence.lower():
+        return "Large acetone/ketones present"
+    return "Ketones present"
+
+
+def enrich_structured_output_with_source_evidence(
+    structured_output: dict,
+    source_text: str | None = None,
+) -> dict:
+    enriched_output = dict(structured_output or {})
+    ketone_evidence = find_ketone_evidence(source_text)
+    if not ketone_evidence:
+        return enriched_output
+
+    enriched_output["ketone_status"] = "present"
+    enriched_output["ketone_evidence"] = ketone_evidence
+
+    key_findings = list(enriched_output.get("key_findings_generated") or [])
+    ketone_finding = ketone_finding_from_evidence(ketone_evidence)
+    if ketone_finding and all(ketone_finding.lower() != item.lower() for item in key_findings):
+        key_findings.append(ketone_finding)
+        enriched_output["key_findings_generated"] = key_findings
+
+    return enriched_output
 
 
 def _contains_non_negated_phrase(text: str, phrase: str) -> bool:
@@ -201,17 +266,7 @@ def has_numeric_or_text_evidence(
     if "osmolality" in normalized_signal:
         return _find_osmolality(search_text) is not None
     if "ketone" in normalized_signal:
-        return _contains_any(
-            search_text,
-            [
-                "ketonemia",
-                "ketonuria",
-                "ketones present",
-                "ketone positive",
-                "positive ketones",
-                "beta-hydroxybutyrate",
-            ],
-        ) is not None
+        return find_ketone_evidence(search_text) is not None
     if normalized_signal == "response to treatment":
         return _contains_any(
             search_text,
@@ -299,7 +354,7 @@ def _match_diabetic_ketoacidosis(text: str) -> tuple[list[str], list[str], str]:
     elif glucose is None:
         missing_data.append("glucose")
 
-    ketone_phrase = _contains_any(text, ["ketonemia", "ketonuria", "ketones present", "ketone positive", "positive ketones"])
+    ketone_phrase = find_ketone_evidence(text)
     if ketone_phrase:
         matches.append(ketone_phrase)
     else:

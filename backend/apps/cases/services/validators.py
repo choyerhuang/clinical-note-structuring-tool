@@ -854,6 +854,7 @@ def _default_verification_result():
     return {
         "is_pass": True,
         "factual_consistency": "pass",
+        "requires_review": False,
         "unsupported_claims": [],
         "missing_key_facts": [],
         "disposition_consistency": "pass",
@@ -871,6 +872,48 @@ def _default_verification_result():
     }
 
 
+def _chief_complaint_is_generic(chief_complaint: str) -> bool:
+    normalized = safe_text(chief_complaint).lower()
+    return normalized in {
+        "diabetes issue",
+        "diabetes/hyperglycemia",
+        "ams, hyperglycemia",
+    }
+
+
+def _apply_verification_decision(normalized: dict) -> dict:
+    hard_failures_present = bool(
+        normalized["unsupported_claims"]
+        or normalized["disposition_inconsistencies"]
+        or normalized["criteria_alignment_issues"]
+        or normalized["disposition_consistency"] == "fail"
+    )
+    review_needed = bool(
+        normalized["missing_key_facts"]
+        or normalized["missing_required_data_for_confident_interpretation"]
+    )
+
+    if hard_failures_present:
+        normalized["is_pass"] = False
+        normalized["requires_review"] = True
+        normalized["factual_consistency"] = "fail"
+        normalized["needs_regeneration"] = True
+        return normalized
+
+    if review_needed:
+        normalized["is_pass"] = True
+        normalized["requires_review"] = True
+        normalized["factual_consistency"] = "pass_with_warnings"
+        normalized["needs_regeneration"] = False
+        return normalized
+
+    normalized["is_pass"] = True
+    normalized["requires_review"] = False
+    normalized["factual_consistency"] = "pass"
+    normalized["needs_regeneration"] = False
+    return normalized
+
+
 def _normalize_verification_result(verification):
     if not isinstance(verification, dict):
         verification = {}
@@ -882,7 +925,7 @@ def _normalize_verification_result(verification):
     ).lower()
 
     normalized["factual_consistency"] = (
-        factual_consistency if factual_consistency in {"pass", "fail"} else "fail"
+        factual_consistency if factual_consistency in {"pass", "pass_with_warnings", "fail"} else "pass"
     )
     normalized["disposition_consistency"] = (
         disposition_consistency
@@ -900,6 +943,7 @@ def _normalize_verification_result(verification):
     )
     normalized["needs_regeneration"] = bool(verification.get("needs_regeneration"))
     normalized["is_pass"] = bool(verification.get("is_pass", True))
+    normalized["requires_review"] = bool(verification.get("requires_review"))
     normalized["disposition_inconsistencies"] = safe_string_list(
         verification.get("disposition_inconsistencies")
     )
@@ -925,15 +969,7 @@ def _normalize_verification_result(verification):
             "Revise the HPI to align only with the structured facts and stated disposition."
         ]
 
-    if (
-        normalized["factual_consistency"] == "fail"
-        or normalized["disposition_consistency"] == "fail"
-        or normalized["unsupported_claims"]
-    ):
-        normalized["needs_regeneration"] = True
-        normalized["is_pass"] = False
-
-    return normalized
+    return _apply_verification_decision(normalized)
 
 
 def _contains_phrase(text: str, phrases: list[str]) -> bool:
@@ -975,12 +1011,16 @@ def verify_revised_hpi(revised_hpi: str, structured: dict, mcg_result: dict | No
     }
 
     if chief_complaint and chief_complaint.lower() not in revised_hpi.lower():
+        chief_complaint_review_message = (
+            "Chief complaint is present but generic."
+            if _chief_complaint_is_generic(chief_complaint)
+            else "Chief complaint should be stated more explicitly."
+        )
         normalized["missing_key_facts"] = list(
             dict.fromkeys(
-                [*normalized["missing_key_facts"], "Chief complaint is not clearly stated."]
+                [*normalized["missing_key_facts"], chief_complaint_review_message]
             )
         )
-        normalized["factual_consistency"] = "fail"
 
     sparse_structured = _structured_data_is_sparse(structured)
     if sparse_structured and structured["disposition_generated"] != "Unknown":
@@ -1191,17 +1231,6 @@ def verify_revised_hpi(revised_hpi: str, structured: dict, mcg_result: dict | No
         dict.fromkeys(normalized["missing_required_data_for_confident_interpretation"])
     )
 
-    if (
-        normalized["factual_consistency"] == "fail"
-        or normalized["disposition_consistency"] == "fail"
-        or normalized["unsupported_claims"]
-        or normalized["criteria_alignment_issues"]
-    ):
-        normalized["needs_regeneration"] = True
-        normalized["is_pass"] = False
-    else:
-        normalized["is_pass"] = True
-
     if normalized["unsupported_claims"]:
         normalized["revision_instructions"] = list(
             dict.fromkeys(
@@ -1230,7 +1259,7 @@ def verify_revised_hpi(revised_hpi: str, structured: dict, mcg_result: dict | No
             )
         )
 
-    return normalized
+    return _apply_verification_decision(normalized)
 
 
 def verification_to_warnings(verification: dict) -> list[str]:

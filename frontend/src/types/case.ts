@@ -1,6 +1,20 @@
 export type CaseStatus = "draft" | "generated" | "saved";
 export type Disposition = "Admit" | "Observe" | "Discharge" | "Unknown";
 export type NoteType = "er" | "hp";
+export interface VerificationResult {
+  is_pass?: boolean;
+  requires_review?: boolean;
+  factual_consistency?: string;
+  unsupported_claims?: string[];
+  missing_key_facts?: string[];
+  disposition_consistency?: string;
+  disposition_inconsistencies?: string[];
+  criteria_alignment_issues?: string[];
+  missing_required_data_for_confident_interpretation?: string[];
+  revision_instructions?: string[];
+  needs_regeneration?: boolean;
+  [key: string]: unknown;
+}
 
 export interface GeneratedResult {
   id: number;
@@ -12,7 +26,7 @@ export interface GeneratedResult {
   uncertainties_generated: string[];
   revised_hpi_generated: string;
   generation_warnings: string[];
-  verification_result: Record<string, unknown> | null;
+  verification_result: VerificationResult | null;
   mcg_result: Record<string, unknown> | null;
   confidence_result: {
     score?: number;

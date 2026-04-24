@@ -12,6 +12,7 @@ import type {
   CaseDetail,
   EditableResultFormValue,
   SaveEditedResultPayload,
+  VerificationResult,
 } from "../types/case";
 
 function normalizeMultilineText(value: string[] | string | null | undefined): string {
@@ -182,6 +183,9 @@ export function CaseDetailPage() {
     return getEditedFields(caseData, editableData);
   }, [caseData, editableData]);
 
+  const verificationResult = (caseData?.generated_result?.verification_result ?? null) as VerificationResult | null;
+  const requiresReview = verificationResult?.requires_review === true;
+
   const handleGenerate = async () => {
     if (!caseData) {
       return;
@@ -303,6 +307,15 @@ export function CaseDetailPage() {
       </div>
 
       {error ? <div className="error-banner">{error}</div> : null}
+      {requiresReview ? (
+        <div className="warning-box">
+          <div className="warning-box__title">Clinical review recommended</div>
+          <ul className="warning-box__list">
+            <li>Missing or uncertain data should be reviewed before finalizing the note.</li>
+            <li>Save Final Result is still available for clinician-reviewed output.</li>
+          </ul>
+        </div>
+      ) : null}
 
       <div className="detail-grid">
         <OriginalNoteCard caseData={caseData} />

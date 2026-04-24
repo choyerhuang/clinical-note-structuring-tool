@@ -1,5 +1,9 @@
 from apps.cases.services.compose import compose_revised_hpi
-from apps.cases.services.criteria import match_mcg_criteria, reconcile_diabetes_disposition
+from apps.cases.services.criteria import (
+    enrich_structured_output_with_source_evidence,
+    match_mcg_criteria,
+    reconcile_diabetes_disposition,
+)
 from apps.cases.services.extract import extract_structured_output
 from apps.cases.services.privacy import redact_phi
 from apps.cases.services.validators import (
@@ -17,6 +21,10 @@ def run_generate_pipeline(note: str) -> dict:
     redacted_note = redact_phi(note)
     raw_structured_output = extract_structured_output(redacted_note)
     structured_output = validate_generated_structured_output(raw_structured_output)
+    structured_output = enrich_structured_output_with_source_evidence(
+        structured_output,
+        source_text=note,
+    )
     validation_warnings = collect_structured_validation_warnings(
         raw_structured_output,
         structured_output,

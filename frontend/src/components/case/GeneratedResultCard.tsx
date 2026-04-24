@@ -1,4 +1,4 @@
-import type { GeneratedResult } from "../../types/case";
+import type { GeneratedResult, VerificationResult } from "../../types/case";
 import { EmptyState } from "./EmptyState";
 import { WarningBox } from "./WarningBox";
 
@@ -41,6 +41,50 @@ function JsonBlock({
   }
 
   return <pre className="note-block">{JSON.stringify(value, null, 2)}</pre>;
+}
+
+function getVerificationLabel(verification: VerificationResult | null | undefined) {
+  if (!verification) {
+    return "Verification metadata unavailable";
+  }
+  if (verification.is_pass === false) {
+    return "Verification: Failed - Possible factual issue";
+  }
+  if (verification.is_pass === true && verification.requires_review === true) {
+    return "Needs Review - Missing or uncertain data";
+  }
+  return "Verification Passed";
+}
+
+function VerificationSummaryBlock({
+  verification,
+}: {
+  verification: VerificationResult | null;
+}) {
+  if (!verification) {
+    return (
+      <div className="field-readonly field-readonly--muted">
+        No verification metadata available.
+      </div>
+    );
+  }
+
+  return (
+    <div className="stack">
+      <div className="field-readonly">{getVerificationLabel(verification)}</div>
+      {verification.revision_instructions?.length ? (
+        <div>
+          <div className="field-label">Review instructions</div>
+          <ul className="warning-box__list">
+            {verification.revision_instructions.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      <JsonBlock value={verification} emptyMessage="No verification metadata available." />
+    </div>
+  );
 }
 
 function ConfidenceBlock({
@@ -119,10 +163,7 @@ export function GeneratedResultCard({
               </div>
               <div>
                 <div className="field-label">Verification</div>
-                <JsonBlock
-                  value={result.verification_result}
-                  emptyMessage="No verification metadata available."
-                />
+                <VerificationSummaryBlock verification={result.verification_result} />
               </div>
               <div>
                 <div className="field-label">Persisted Warnings</div>

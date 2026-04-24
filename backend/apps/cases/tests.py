@@ -9,7 +9,11 @@ from pypdf import PdfWriter
 from rest_framework.test import APIClient
 
 from apps.cases.services.compose import compose_revised_hpi
-from apps.cases.services.criteria import match_mcg_criteria, reconcile_diabetes_disposition
+from apps.cases.services.criteria import (
+    enrich_structured_output_with_source_evidence,
+    match_mcg_criteria,
+    reconcile_diabetes_disposition,
+)
 from apps.cases.services.extract import extract_structured_output
 from apps.cases.services.file_parsing import parse_uploaded_note_file
 from apps.cases.services.pipeline import run_generate_pipeline
@@ -109,6 +113,7 @@ class VerifyRevisedHPITests(SimpleTestCase):
             {
                 "is_pass",
                 "factual_consistency",
+                "requires_review",
                 "unsupported_claims",
                 "missing_key_facts",
                 "disposition_consistency",
@@ -144,6 +149,73 @@ class VerifyRevisedHPITests(SimpleTestCase):
         self.assertFalse(result["is_pass"])
         self.assertTrue(result["unsupported_claims"])
         self.assertTrue(result["needs_regeneration"])
+        self.assertTrue(result["requires_review"])
+
+    def test_verify_missing_data_only_returns_pass_with_review(self):
+        result = verify_revised_hpi(
+            "The patient presented with hyperglycemia and requires continued monitoring.",
+            {
+                "chief_complaint_generated": "Diabetes/Hyperglycemia",
+                "hpi_summary_generated": "Hyperglycemia with dehydration and incomplete workup.",
+                "key_findings_generated": ["Glucose 320 mg/dL", "Dehydration"],
+                "suspected_conditions_generated": ["diabetes"],
+                "disposition_generated": "Admit",
+                "uncertainties_generated": [],
+            },
+            mcg_result={
+                "applicable": True,
+                "matched_criteria": [],
+                "support_level": "low",
+                "supported": False,
+                "missing_data": ["ketone level", "pH"],
+                "disposition_context": {
+                    "requires_admit_with_monitoring": True,
+                },
+            },
+        )
+
+        self.assertTrue(result["is_pass"])
+        self.assertTrue(result["requires_review"])
+        self.assertEqual(result["factual_consistency"], "pass_with_warnings")
+        self.assertFalse(result["needs_regeneration"])
+        self.assertIn(
+            "Chief complaint is present but generic.",
+            result["missing_key_facts"],
+        )
+
+
+class SourceEvidenceEnrichmentTests(SimpleTestCase):
+    def test_enrich_structured_output_adds_ketone_evidence_from_acetone_phrase(self):
+        result = enrich_structured_output_with_source_evidence(
+            {
+                "chief_complaint_generated": "AMS, hyperglycemia",
+                "hpi_summary_generated": "Hyperglycemia with acidosis concerns.",
+                "key_findings_generated": ["Glucose 320 mg/dL"],
+                "suspected_conditions_generated": ["diabetes"],
+                "disposition_generated": "Admit",
+                "uncertainties_generated": [],
+            },
+            source_text="Acetone Semiqt large A with glucose 320 mg/dL",
+        )
+
+        self.assertEqual(result["ketone_status"], "present")
+        self.assertIn("Acetone Semiqt large", result["ketone_evidence"])
+        self.assertIn("Large acetone/ketones present", result["key_findings_generated"])
+
+    def test_match_mcg_does_not_mark_ketone_missing_when_acetone_is_present(self):
+        result = match_mcg_criteria(
+            {
+                "chief_complaint_generated": "Hyperglycemia",
+                "hpi_summary_generated": "Hyperglycemia with dehydration.",
+                "key_findings_generated": ["Glucose 320 mg/dL", "Large acetone/ketones present"],
+                "suspected_conditions_generated": ["diabetes"],
+                "disposition_generated": "Admit",
+                "uncertainties_generated": [],
+            },
+            source_text="ACETONE LARGE A glucose 320 mg/dL bicarbonate 14 anion gap 18",
+        )
+
+        self.assertNotIn("ketone level", result["missing_data"])
 
     def test_verify_does_not_penalize_admit_when_diabetes_mcg_not_applicable(self):
         result = verify_revised_hpi(
