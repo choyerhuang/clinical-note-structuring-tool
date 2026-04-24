@@ -108,6 +108,7 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+APPEND_SLASH = False
 
 # CORS_ALLOWED_ORIGINS = env_csv_list(
 #     "CORS_ALLOWED_ORIGINS",
@@ -125,5 +126,4 @@ CSRF_TRUSTED_ORIGINS = env_csv_list(
     ],
 )
 
-# print("CORS_ALLOWED_ORIGINS loaded:", CORS_ALLOWED_ORIGINS)
 print("CSRF_TRUSTED_ORIGINS loaded:", CSRF_TRUSTED_ORIGINS)

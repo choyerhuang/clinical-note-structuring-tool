@@ -8,10 +8,3 @@ export const apiClient = axios.create({
     "Content-Type": "application/json",
   },
 });
-
-apiClient.interceptors.request.use((config) => {
-  if (config.url) {
-    config.url = config.url.replace(/\/+$/, "");
-  }
-  return config;
-});
