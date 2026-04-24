@@ -1,8 +1,16 @@
 {
-  "rewrites": [
+  "routes": [
     {
-      "source": "/backend/:path*",
-      "destination": "https://clinical-note-structuring-tool.onrender.com/api/:path*"
+      "src": "/backend/(.*)",
+      "dest": "https://clinical-note-structuring-tool.onrender.com/api/$1"
+    },
+    {
+      "src": "/backend",
+      "dest": "https://clinical-note-structuring-tool.onrender.com/api"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ]
 }
