@@ -16,8 +16,11 @@ from apps.cases.services.validators import (
     verify_revised_hpi,
 )
 
+## LLM response generated pipeline
+## extract -> validate -> match -> verify -> output
 
 def run_generate_pipeline(note: str) -> dict:
+    ## simple PHI & PPI filter to prevent from personal information be misused.
     redacted_note = redact_phi(note)
     raw_structured_output = extract_structured_output(redacted_note)
     structured_output = validate_generated_structured_output(raw_structured_output)

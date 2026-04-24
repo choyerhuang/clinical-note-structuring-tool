@@ -15,17 +15,17 @@ from apps.cases.services.llm_client import LLMServiceError
 from apps.cases.services.pipeline import run_generate_pipeline
 from apps.cases.services.file_parsing import parse_uploaded_note_file
 
-
+## Get all cases or Generate new Case
 class CaseListCreateView(generics.ListCreateAPIView):
     queryset = Case.objects.select_related("generated_result", "edited_result").all()
     serializer_class = CaseSerializer
 
-
+## Handle single case
 class CaseRetrieveView(generics.RetrieveAPIView):
     queryset = Case.objects.select_related("generated_result", "edited_result").all()
     serializer_class = CaseSerializer
 
-
+## Handle single case get and delete
 class CaseRetrieveDeleteView(generics.RetrieveDestroyAPIView):
     queryset = Case.objects.select_related("generated_result", "edited_result").all()
     serializer_class = CaseSerializer
@@ -36,6 +36,7 @@ class CaseRetrieveDeleteView(generics.RetrieveDestroyAPIView):
         return Response({"success": True}, status=status.HTTP_200_OK)
 
 
+## LLM Generate calling
 class CaseGenerateView(APIView):
     def post(self, request, pk):
         case = get_object_or_404(
@@ -44,7 +45,7 @@ class CaseGenerateView(APIView):
         )
 
         try:
-            pipeline_result = run_generate_pipeline(case.original_note)
+            pipeline_result = run_generate_pipeline(case.original_note) 
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         except LLMServiceError as exc:
@@ -95,7 +96,7 @@ class CaseGenerateView(APIView):
         }
         return Response(response_data, status=status.HTTP_200_OK)
 
-
+## Human-in-loop design check difference between difference and edited, saved in Database
 class CaseSaveView(APIView):
     def put(self, request, pk):
         case = get_object_or_404(

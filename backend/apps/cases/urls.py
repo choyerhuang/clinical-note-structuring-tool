@@ -10,6 +10,7 @@ from apps.cases.views import (
 
 app_name = "cases"
 
+## regex urls design
 urlpatterns = [
     re_path(r"^cases/?$", CaseListCreateView.as_view(), name="case-list-create"),
     re_path(r"^cases/(?P<pk>\d+)/?$", CaseRetrieveDeleteView.as_view(), name="case-detail"),
