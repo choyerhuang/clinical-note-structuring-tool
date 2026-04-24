@@ -14,7 +14,7 @@ environ.Env.read_env(BASE_DIR / ".env")
 SECRET_KEY = env("DJANGO_SECRET_KEY", default="change-me-in-env")
 DEBUG = env("DJANGO_DEBUG")
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=[])
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS_ALLOW_ALL_ORIGINS = True
 
 def env_csv_list(name, default=None):
     value = os.environ.get(name)
@@ -110,13 +110,13 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 APPEND_SLASH = False
 
-# CORS_ALLOWED_ORIGINS = env_csv_list(
-#     "CORS_ALLOWED_ORIGINS",
-#     default=[
-#         "http://localhost:5173",
-#         "http://127.0.0.1:5173",
-#     ],
-# )
+CORS_ALLOWED_ORIGINS = env_csv_list(
+    "CORS_ALLOWED_ORIGINS",
+    default=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+)
 
 CSRF_TRUSTED_ORIGINS = env_csv_list(
     "CSRF_TRUSTED_ORIGINS",
