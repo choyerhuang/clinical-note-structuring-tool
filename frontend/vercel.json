@@ -1,0 +1,12 @@
+{
+  "routes": [
+    {
+      "src": "/backend/(.*)",
+      "dest": "https://clinical-note-structuring-tool.onrender.com/api/$1"
+    },
+    {
+      "src": "/backend",
+      "dest": "https://clinical-note-structuring-tool.onrender.com/api"
+    }
+  ]
+}
