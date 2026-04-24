@@ -34,6 +34,8 @@ Live Demo URL: https://clinical-note-structuring-tool-1.onrender.com
 
 Both the frontend and backend are deployed on Render. Since this project uses Render's free hosting tier, the backend service may enter an idle state after a period of inactivity. If the demo appears slow on the first request, please wait briefly and refresh or retry the action once the backend wakes up.
 
+![System Architecture](./Demo_view.png)
+
 ## Overview
 
 A full-stack clinical note structuring system that converts unstructured ER/H&P notes into structured clinical data and an admission-supporting Revised HPI using a multi-stage, verifiable pipeline.
