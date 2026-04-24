@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/backend/:path*",
+      "destination": "https://clinical-note-structuring-tool.onrender.com/api/:path*"
+    }
+  ]
+}

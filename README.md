@@ -490,7 +490,64 @@ npm install
 npm run dev
 ```
 
-The frontend proxies `/api` requests to the backend during local development.
+For local development, the frontend uses a Vite proxy so requests to `/backend/*` are rewritten to `http://127.0.0.1:8000/api/*`.
+
+## Render Deployment
+
+This project can be deployed with:
+
+- Django backend as a Render Web Service
+- React/Vite frontend as a Render Static Site
+
+The Render frontend should call the backend directly through a configured environment variable, while local development continues using the `/backend` Vite proxy.
+
+### Backend Web Service
+
+- Existing backend URL:
+  `https://clinical-note-structuring-tool.onrender.com`
+- Set environment variables such as:
+
+```env
+CORS_ALLOWED_ORIGINS=https://<frontend-service-name>.onrender.com,http://localhost:5173,http://127.0.0.1:5173
+CSRF_TRUSTED_ORIGINS=https://<frontend-service-name>.onrender.com,http://localhost:5173,http://127.0.0.1:5173
+```
+
+### Frontend Static Site
+
+- Root Directory:
+  `frontend`
+- Build Command:
+  `npm install && npm run build`
+- Publish Directory:
+  `dist`
+- Environment variable:
+
+```env
+VITE_API_BASE_URL=https://clinical-note-structuring-tool.onrender.com/api
+```
+
+### Verification
+
+After deploying the frontend Static Site on Render, open the app and inspect the browser Network tab.
+
+Expected production API request:
+
+```text
+https://clinical-note-structuring-tool.onrender.com/api/cases
+```
+
+Unexpected production requests:
+
+```text
+/backend/cases
+/api/cases
+https://<any-vercel-domain>/...
+```
+
+Note:
+
+- `frontend/vercel.json` is no longer required for Render Static Site deployment.
+- Local development still uses `/backend` via the Vite proxy.
 
 ---
 
@@ -598,8 +655,7 @@ If given more time, useful improvements would include:
 - full production-grade de-identification pipeline
 - deployment hardening and monitoring
 - expanded automated tests for generation edge cases
-- additional multi-layer validation, including extraction output validation, field-level independent validators, and cross-component consistency checks.
-- with potential integration of locally deployed LLM models for validation and privacy-sensitive workflows
+- additional multi-layer validation, including extraction output validation, field-level independent validators, and cross-component consistency checks with potential integration of locally deployed LLM models for validation and privacy-sensitive workflows
 
 ---
 

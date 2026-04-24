@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import re_path
 
 from apps.cases.views import (
     CaseGenerateView,
@@ -11,9 +11,21 @@ from apps.cases.views import (
 app_name = "cases"
 
 urlpatterns = [
-    path("cases/", CaseListCreateView.as_view(), name="case-list-create"),
-    path("cases/<int:pk>/", CaseRetrieveDeleteView.as_view(), name="case-detail"),
-    path("cases/<int:pk>/generate/", CaseGenerateView.as_view(), name="case-generate"),
-    path("cases/<int:pk>/save/", CaseSaveView.as_view(), name="case-save"),
-    path("uploads/parse-note/", NoteParseUploadView.as_view(), name="parse-note-upload"),
+    re_path(r"^cases/?$", CaseListCreateView.as_view(), name="case-list-create"),
+    re_path(r"^cases/(?P<pk>\d+)/?$", CaseRetrieveDeleteView.as_view(), name="case-detail"),
+    re_path(
+        r"^cases/(?P<pk>\d+)/generate/?$",
+        CaseGenerateView.as_view(),
+        name="case-generate",
+    ),
+    re_path(
+        r"^cases/(?P<pk>\d+)/save/?$",
+        CaseSaveView.as_view(),
+        name="case-save",
+    ),
+    re_path(
+        r"^uploads/parse-note/?$",
+        NoteParseUploadView.as_view(),
+        name="parse-note-upload",
+    ),
 ]
