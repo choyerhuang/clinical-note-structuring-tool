@@ -1,14 +1,6 @@
 {
   "rewrites": [
     {
-      "source": "/api/cases/",
-      "destination": "https://clinical-note-structuring-tool.onrender.com/api/cases"
-    },
-    {
-      "source": "/api/cases/:path*/",
-      "destination": "https://clinical-note-structuring-tool.onrender.com/api/cases/:path*"
-    },
-    {
       "source": "/api/:path*",
       "destination": "https://clinical-note-structuring-tool.onrender.com/api/:path*"
     }
