@@ -14,7 +14,7 @@ environ.Env.read_env(BASE_DIR / ".env")
 SECRET_KEY = env("DJANGO_SECRET_KEY", default="change-me-in-env")
 DEBUG = env("DJANGO_DEBUG")
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=[])
-
+CORS_ALLOW_ALL_ORIGINS = True
 
 def env_csv_list(name, default=None):
     value = os.environ.get(name)
