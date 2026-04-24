@@ -1,6 +1,8 @@
+import os
 from pathlib import Path
 
 import environ
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -15,11 +17,10 @@ ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=[])
 
 
 def env_csv_list(name, default=None):
-    default = default or []
-    raw_value = env(name, default="")
-    if not raw_value:
-        return default
-    return [item.strip() for item in raw_value.split(",") if item.strip()]
+    value = os.environ.get(name)
+    if not value:
+        return default or []
+    return [item.strip() for item in value.split(",") if item.strip()]
 
 
 INSTALLED_APPS = [
@@ -35,9 +36,9 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -64,8 +65,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
-
-import dj_database_url
 
 if env("DATABASE_URL", default=None):
     DATABASES = {
@@ -125,3 +124,6 @@ CSRF_TRUSTED_ORIGINS = env_csv_list(
         "http://127.0.0.1:5173",
     ],
 )
+
+print("CORS_ALLOWED_ORIGINS loaded:", CORS_ALLOWED_ORIGINS)
+print("CSRF_TRUSTED_ORIGINS loaded:", CSRF_TRUSTED_ORIGINS)
