@@ -613,6 +613,57 @@ AI-assisted tools, including ChatGPT, Codex, and Gemini, were used during develo
 - debugging assistance
 - documentation drafting
 
+## Prompt Usage (Representative Examples)
+
+1. Frontend Scaffolding
+```text
+Build a React + TypeScript form for creating a case with:
+- title input
+- ER note textarea
+- H&P note textarea
+- submit button that calls POST /api/cases
+
+Focus on clean component structure and state management.
+```
+2. API Integration Pattern
+```text
+Given a Django REST endpoint POST /api/cases/{id}/generate,
+write a React handler using fetch that:
+- sends request
+- handles loading state
+- updates UI with response
+- handles error cases
+```
+3. Clinical Note Structuring (LLM Prompt Design)
+```text
+Extract structured clinical information from the following note.
+
+Return JSON with:
+- chief_complaint
+- hpi_summary
+- key_findings (list)
+- suspected_conditions (list)
+- disposition
+
+Rules:
+- Do not invent facts
+- If missing information, include in uncertainties
+- Ensure output is consistent and parseable
+```
+
+4. Revised HPI Generation
+```text
+Generate a revised HPI using:
+- structured output
+- admission guideline
+
+Requirements:
+- logically support admission decision
+- no hallucinated facts
+- highlight clinical severity and failed outpatient treatment if present
+```
+Prompts were iteratively refined to reduce hallucination and improve structured consistency.
+
 Core design decisions were manually designed, reviewed and refined, including:
 
 - multi-stage generation pipeline architecture
