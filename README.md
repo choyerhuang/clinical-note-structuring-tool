@@ -6,26 +6,6 @@ This project is a **technical demonstration** and should **not be used with real
 
 Although the system includes a lightweight PHI/PII protection layer, such as redaction of names, SSN, phone numbers, emails, DOB, MRN/patient IDs, and labeled addresses before LLM calls, it is **not designed to be HIPAA-compliant** and does not provide guarantees for handling protected health information.
 
-### Why this matters
-
-This system uses an LLM-based pipeline to process clinical notes. Even with safeguards, sending real patient data to external or locally hosted models introduces potential risks, including:
-
-- Incomplete or imperfect de-identification, because regex-based redaction is not exhaustive
-- Possible data exposure through model providers, infrastructure, logs, or debugging layers
-- Lack of formal production compliance controls, such as audit logging, access control, encryption policies, and regulatory review
-
-### Design decision
-
-For this reason, the system is intentionally designed as a **development/demo environment**.
-
-- Original notes are preserved for user review
-- A lightweight redaction layer is applied before LLM interaction
-- Safety mechanisms such as uncertainty handling, verification, and confidence scoring focus on **reasoning quality**, not regulatory compliance
-
-This allows rapid iteration on clinical reasoning structure, LLM pipeline design, validation logic, and verification strategies without creating false assumptions of production-level data safety.
-
-> If deployed in a real-world clinical setting, this system would require a fully compliant data-handling pipeline, including robust de-identification, secure infrastructure, access control, audit logging, and regulatory review.
-
 ---
 
 ## Live Demo
@@ -42,13 +22,113 @@ A full-stack clinical note structuring system that converts unstructured ER/H&P 
 
 The system follows a structured multi-stage pipeline (detailed below) to transform clinical notes into structured outputs and a Revised HPI.
 
+## System Architecture
+
+The system follows a layered architecture from frontend to backend, with a structured generation pipeline:
+
+The following diagram illustrates the end-to-end data flow:
+
+![System Architecture](./Data_workflow.png)
+
+The generation pipeline is implemented as a multi-stage process:
+extract → validate → criteria match → compose → verify → confidence
+
+This architecture separates concerns between:
+- UI interaction (frontend)
+- API handling (backend)
+- reasoning and transformation (pipeline)
+- persistence (database)
+
+---
+
+## End-to-End Workflow
+
+1. User inputs clinical note text using ER note, H&P note, or combined original clinical note fields.
+2. The frontend merges note sources into a single `original_note`.
+3. The case is created through `POST /api/cases/`.
+4. The user triggers generation through `POST /api/cases/:id/generate/`.
+5. The backend runs the generation pipeline.
+6. The generated result is persisted.
+7. The frontend displays structured output, Revised HPI, and generation insights.
+8. The user reviews and edits the final result.
+9. The final edited version is saved through `PUT /api/cases/:id/save/`.
+10. The case can later be reopened with both the machine-generated result and the human-edited final result.
+
+
+
+---
+
 ##  Design Decisions & Trade-offs
 
 ### 1. Multi-Stage Pipeline over Single LLM Call
 
 Instead of relying on a single prompt to generate the final output, the system uses a structured multi-stage pipeline:
 
-extract → validate → criteria → compose → verify → confidence
+![Generation pipeline](./Generation_pipeline.png)
+
+```text
+original_note
+  → extract structured output
+  → validate structured data
+  → match criteria / MCG-style logic
+  → reconcile disposition when applicable
+  → compose Revised HPI
+  → verify output
+  → optional one-pass retry
+  → build warnings
+  → calculate admission-support confidence
+  → build uncertainties
+  → persist GeneratedResult
+```
+
+This project intentionally avoids a single-call LLM design. Instead, it uses a staged pipeline so that each step is easier to validate, inspect, and improve.
+
+#### 1. Extraction
+
+The system converts free-text clinical notes into structured JSON fields.
+
+#### 2. Validation
+
+The structured output is normalized and checked for schema consistency. This helps ensure that downstream rendering, editing, saving, and verification use a consistent data shape.
+
+#### 3. Criteria Matching
+
+The backend applies rule-based criteria matching where applicable. In the current version, the criteria layer focuses on diabetes-related admission-support patterns and MCG-style reasoning.
+
+#### 4. Revised HPI Composition
+
+The system composes a Revised HPI from structured facts instead of directly rewriting the raw note. This helps reduce unsupported claims and keeps the narrative aligned with extracted clinical evidence.
+
+#### 5. Verification
+
+The verifier checks the generated Revised HPI and structured output for:
+
+- unsupported claims
+- missing key facts
+- factual consistency
+- disposition consistency
+- criteria alignment issues
+- missing data needed for confident interpretation
+
+#### 6. Optional Retry
+
+If verification indicates that regeneration is needed, the system performs one targeted retry rather than repeatedly looping without control.
+
+#### 7. Warning and Confidence Generation
+
+The system builds user-facing generation warnings and calculates an explainable Admission Support Confidence score based on factors such as:
+
+- verifier result
+- criteria support level
+- critical missing data
+- general missing clinical information
+- unsupported claims
+- disposition inconsistency
+- low-information input
+
+#### 8. Uncertainty Handling
+
+The system explicitly surfaces missing or uncertain information instead of inventing it. This includes both condition-specific missing information and general clinical completeness checks.
 
 This design improves:
 
@@ -58,19 +138,7 @@ This design improves:
 
 ---
 
-### 2. Explicit Uncertainty Handling
-
-Rather than implicitly assuming missing data, the system explicitly surfaces uncertainties (e.g., missing labs, vitals, duration).
-
-This ensures:
-
-- No hallucinated clinical values  
-- Transparency for reviewers  
-- Safer downstream decision interpretation  
-
----
-
-### 3. Verification + Limited Retry Strategy (Demo-Oriented)
+### 2. Verification + Limited Retry Strategy (Demo-Oriented)
 
 A verification step is used to detect:
 
@@ -97,7 +165,7 @@ In a production system, a more advanced retry or self-correction loop could be i
 
 ---
 
-### 4. Warning-Centric Design
+### 3. Warning-Centric Design
 
 Instead of forcing the model to "fix everything," the system:
 
@@ -111,7 +179,7 @@ This aligns with:
 
 ---
 
-### 5. Admission Support Confidence (Rule-Based)
+### 4. Admission Support Confidence (Rule-Based)
 
 A deterministic scoring system is used to estimate documentation support for admission decisions.
 
@@ -129,7 +197,7 @@ This provides:
 
 ---
 
-### 6. Lightweight PHI Protection
+### 5. Lightweight PHI Protection
 
 A simple redaction layer is applied before sending data to the LLM to remove:
 
@@ -147,11 +215,11 @@ A simple redaction layer is applied before sending data to the LLM to remove:
 But:
 
 - Not exhaustive  
-- Not HIPAA-compliant  
+- Not fully HIPAA-compliant  
 
 ---
 
-### 7. External LLM vs Local Model (Cost vs Privacy Trade-off)
+### 6. External LLM vs Local Model (Cost vs Privacy Trade-off)
 
 For this demo, the system uses an external LLM provider (OpenAI API) to:
 
@@ -171,7 +239,7 @@ In a production setting:
 
 ---
 
-### 8. Design Philosophy
+### 7. Design Philosophy
 
 This project prioritizes:
 
@@ -207,109 +275,6 @@ This project prioritizes:
   - save final version
   - reopen saved cases
 
----
-
-## System Architecture
-
-The system follows a layered architecture from frontend to backend, with a structured generation pipeline:
-
-The following diagram illustrates the end-to-end data flow:
-
-![System Architecture](./Data_workflow.png)
-
-The generation pipeline is implemented as a multi-stage process:
-extract → validate → criteria match → compose → verify → confidence
-
-This architecture separates concerns between:
-- UI interaction (frontend)
-- API handling (backend)
-- reasoning and transformation (pipeline)
-- persistence (database)
-
----
-
-## End-to-End Workflow
-
-1. User inputs clinical note text using ER note, H&P note, or combined original clinical note fields.
-2. The frontend merges note sources into a single `original_note`.
-3. The case is created through `POST /api/cases/`.
-4. The user triggers generation through `POST /api/cases/:id/generate/`.
-5. The backend runs the generation pipeline.
-6. The generated result is persisted.
-7. The frontend displays structured output, Revised HPI, and generation insights.
-8. The user reviews and edits the final result.
-9. The final edited version is saved through `PUT /api/cases/:id/save/`.
-10. The case can later be reopened with both the machine-generated result and the human-edited final result.
-
-Backend generation flow:
-
-```text
-original_note
-  → extract structured output
-  → validate structured data
-  → match criteria / MCG-style logic
-  → reconcile disposition when applicable
-  → compose Revised HPI
-  → verify output
-  → optional one-pass retry
-  → build warnings
-  → calculate admission-support confidence
-  → build uncertainties
-  → persist GeneratedResult
-```
-
----
-
-## Generation Pipeline Design
-
-This project intentionally avoids a single-call LLM design. Instead, it uses a staged pipeline so that each step is easier to validate, inspect, and improve.
-
-### 1. Extraction
-
-The system converts free-text clinical notes into structured JSON fields.
-
-### 2. Validation
-
-The structured output is normalized and checked for schema consistency. This helps ensure that downstream rendering, editing, saving, and verification use a consistent data shape.
-
-### 3. Criteria Matching
-
-The backend applies rule-based criteria matching where applicable. In the current version, the criteria layer focuses on diabetes-related admission-support patterns and MCG-style reasoning.
-
-### 4. Revised HPI Composition
-
-The system composes a Revised HPI from structured facts instead of directly rewriting the raw note. This helps reduce unsupported claims and keeps the narrative aligned with extracted clinical evidence.
-
-### 5. Verification
-
-The verifier checks the generated Revised HPI and structured output for:
-
-- unsupported claims
-- missing key facts
-- factual consistency
-- disposition consistency
-- criteria alignment issues
-- missing data needed for confident interpretation
-
-### 6. Optional Retry
-
-If verification indicates that regeneration is needed, the system performs one targeted retry rather than repeatedly looping without control.
-
-### 7. Warning and Confidence Generation
-
-The system builds user-facing generation warnings and calculates an explainable Admission Support Confidence score based on factors such as:
-
-- verifier result
-- criteria support level
-- critical missing data
-- general missing clinical information
-- unsupported claims
-- disposition inconsistency
-- low-information input
-
-### 8. Uncertainty Handling
-
-The system explicitly surfaces missing or uncertain information instead of inventing it. This includes both condition-specific missing information and general clinical completeness checks.
 
 ---
 
@@ -705,16 +670,56 @@ The project was manually smoke-tested for:
 
 ## Future Improvements
 
-If given more time, useful improvements would include:
+### Self-Evolving Prompts
 
-- broader condition-specific admission criteria
-- stronger clinical evidence attribution from generated fields back to source sentences
-- more polished human-readable verification summaries
-- role-based access control and audit logging
-- full production-grade de-identification pipeline
-- deployment hardening and monitoring
-- expanded automated tests for generation edge cases
-- additional multi-layer validation, including extraction output validation, field-level independent validators, and cross-component consistency checks with potential integration of locally deployed LLM models for validation and privacy-sensitive workflows
+The system already tracks which fields clinicians edit and what they change. This data can drive prompt improvement:
+
+- Cluster common correction patterns to identify systematic LLM weaknesses
+- Generate prompt refinement candidates from correction patterns
+- A/B test prompt versions using edit rate as the quality proxy
+- Version prompts with performance metadata for rollback
+
+### Multi-Layer Clinical Reasoning
+
+The current pipeline is linear: extract → compose → verify. A multi-layer architecture would mirror how experienced clinicians think:
+
+```
+Layer 1: Surface Extraction     → "What facts are stated?"
+Layer 2: Clinical Reasoning     → "What clinical picture emerges? What's inconsistent?"
+Layer 3: Disposition Deliberation → Arguments for/against each disposition
+Layer 4: Narrative Synthesis     → Compose HPI incorporating layers 2-3
+```
+
+Each layer's output would be persisted, creating an auditable reasoning trace. This could leverage LLM extended thinking / chain-of-thought capabilities within a single API call.
+
+### Retrieval-Augmented Generation (RAG)
+
+Clinical knowledge is currently embedded in prompts and hardcoded rules. RAG would enable dynamic knowledge access:
+
+- **Criteria Knowledge Base:** Index all admission criteria as retrievable documents; given a patient's findings, retrieve relevant criteria dynamically instead of routing through condition-specific code
+- **Clinical Protocol Reference:** Embed hospital-specific protocols and guidelines for the composer to reference
+- **Case Similarity Search:** Index prior cases and their clinician-edited outputs as few-shot examples, creating a continuously improving knowledge base
+
+### Closed-Loop Feedback System
+
+Connect user edits back to system improvement:
+
+![Evolution Loop](./Feed_back.png)
+
+Key signals: disposition overrides inform reconciliation thresholds, finding additions reveal extraction gaps, finding removals reveal hallucination patterns, and acceptance-without-edit is the strongest quality signal.
+
+### Additional Opportunities
+
+| Idea | Value |
+|------|-------|
+| **Hybrid verification** | Run rule-based checks first; escalate to LLM verification only when ambiguous. Bounds cost while improving coverage. |
+| **Streaming generation** | Show intermediate results progressively (structured fields → criteria → narrative) instead of waiting for the full pipeline. Reduces perceived latency. |
+| **Declarative criteria DSL** | Let clinical staff define admission criteria in YAML/JSON rather than code. Dramatically reduces the cost of adding new conditions. |
+| **Multi-model consensus** | For borderline dispositions, run extraction through multiple LLMs and flag disagreements. Costly but valuable for high-stakes decisions. |
+| **Temporal reasoning** | Track clinical trajectories across serial notes (ER → H&P → progress). Detect trends (glucose trending down, treatment response over time) rather than treating each note independently. |
+| **Explainability** | "Why did the system recommend Admit?" — trace through criteria matches, evidence, and disposition logic. The data already exists; this is primarily a UX investment. |
+| **Comparative case analysis** | Surface similar past cases and their outcomes to help clinicians calibrate their judgment against institutional patterns. |
+
 
 ---
 
